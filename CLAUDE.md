@@ -4,9 +4,11 @@
 Hackathon project for Sound Credit Union's HuskyHack 2026 challenge. Build a fraud intervention tool that recognizes when a member is being manipulated, compromised, or deceived and delivers the right intervention before money is lost.
 
 ## Architecture
-- **Framework**: React 19 + Vite + TypeScript + Tailwind CSS v4 + shadcn/ui
-- **Data**: Synthetic event data (7,471 events, 118 members) in `src/data/events.json` and member key in `src/data/members.json`
-- **No backend** - this is a clickable prototype/demo
+- **Monorepo**: npm workspaces with `client/` and `server/`
+- **Client**: React 19 + Vite + TypeScript + Tailwind CSS v4 + shadcn/ui
+- **Server**: Express + TypeScript
+- **Database**: Supabase (Postgres) — members and events tables with RLS
+- **Data**: Synthetic event data (7,471 events, 118 members) seeded into Supabase
 
 ## Demo Structure
 Two-panel or tab-switched layout:
@@ -46,8 +48,10 @@ Two-panel or tab-switched layout:
 - All data is synthetic/fictional
 
 ## Commands
-- `npm run dev` - Start dev server
-- `npm run build` - Build for production
+- `npm run dev` - Start client dev server (Vite)
+- `npm run dev:server` - Start backend dev server (Express)
+- `npm run dev:all` - Start both client and server
+- `npm run build` - Build both client and server
 
 # CLAUDE.md
 

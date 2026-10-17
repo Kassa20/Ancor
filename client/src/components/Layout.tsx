@@ -10,7 +10,7 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 
-export type View = "dashboard" | "transactions" | "trusted-contact";
+export type View = "dashboard" | "transactions" | "trusted-contact" | "send-money";
 
 interface LayoutProps {
   currentView: View;
@@ -123,7 +123,9 @@ export function Layout({
             <Menu className="size-5" />
           </button>
           <h1 className="text-lg font-semibold">
-            {navItems.find((n) => n.id === currentView)?.label ?? "Dashboard"}
+            {currentView === "send-money"
+              ? "Send Money"
+              : (navItems.find((n) => n.id === currentView)?.label ?? "Dashboard")}
           </h1>
           <div className="ml-auto flex items-center gap-2">
             <button className="relative rounded-md p-2 text-muted-foreground hover:bg-muted hover:text-foreground">

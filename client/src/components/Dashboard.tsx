@@ -27,6 +27,7 @@ interface DashboardProps {
   onViewTransactions: () => void;
   trustedContact: TrustedContactInfo | null;
   onSetupTrustedContact: () => void;
+  onSendMoney: () => void;
 }
 
 function getSpendingThisMonth(events: Event[]): number {
@@ -71,6 +72,7 @@ export function Dashboard({
   onViewTransactions,
   trustedContact,
   onSetupTrustedContact,
+  onSendMoney,
 }: DashboardProps) {
   const [balanceVisible, setBalanceVisible] = useState(true);
   const balance = getLatestBalance(events);
@@ -117,7 +119,10 @@ export function Dashboard({
       </div>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <button className="flex items-center gap-3 rounded-xl border border-border bg-card p-4 transition-colors hover:bg-muted/50">
+        <button
+          onClick={onSendMoney}
+          className="flex items-center gap-3 rounded-xl border border-border bg-card p-4 transition-colors hover:bg-muted/50"
+        >
           <div className="flex size-10 items-center justify-center rounded-full bg-primary/10 text-primary">
             <Send className="size-4" />
           </div>
