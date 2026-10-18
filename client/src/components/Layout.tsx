@@ -3,6 +3,7 @@ import {
   ArrowLeftRight,
   ShieldCheck,
   Landmark,
+  ShieldAlert,
   Bell,
   Menu,
   X,
@@ -10,12 +11,20 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 
-export type View = "dashboard" | "transactions" | "trusted-contact" | "send-money";
+export type View =
+  | "dashboard"
+  | "transactions"
+  | "trusted-contact"
+  | "send-money"
+  | "questionnaire"
+  | "risk-result"
+  | "fraud-console";
 
 interface LayoutProps {
   currentView: View;
   onViewChange: (view: View) => void;
   memberName: string;
+  headerExtra?: React.ReactNode;
   children: React.ReactNode;
 }
 
@@ -35,12 +44,18 @@ const navItems: { id: View; label: string; icon: React.ReactNode }[] = [
     label: "Trusted Contact",
     icon: <ShieldCheck className="size-5" />,
   },
+  {
+    id: "fraud-console",
+    label: "Fraud Console (employee)",
+    icon: <ShieldAlert className="size-5" />,
+  },
 ];
 
 export function Layout({
   currentView,
   onViewChange,
   memberName,
+  headerExtra,
   children,
 }: LayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -125,9 +140,12 @@ export function Layout({
           <h1 className="text-lg font-semibold">
             {currentView === "send-money"
               ? "Send Money"
-              : (navItems.find((n) => n.id === currentView)?.label ?? "Dashboard")}
+              : currentView === "questionnaire" || currentView === "risk-result"
+                ? "Payment Check"
+                : (navItems.find((n) => n.id === currentView)?.label ?? "Dashboard")}
           </h1>
           <div className="ml-auto flex items-center gap-2">
+            {headerExtra}
             <button className="relative rounded-md p-2 text-muted-foreground hover:bg-muted hover:text-foreground">
               <Bell className="size-5" />
               <span className="absolute right-1.5 top-1.5 size-2 rounded-full bg-destructive" />

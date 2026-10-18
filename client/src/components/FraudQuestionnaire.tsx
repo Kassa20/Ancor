@@ -4,18 +4,22 @@ import {
   Phone,
   ChevronRight,
   ChevronLeft,
-  AlertTriangle,
   CheckCircle2,
-  Clock,
-  XCircle,
-  Send,
-  MessageCircle,
   Globe,
 } from "lucide-react";
+import { formatCurrency } from "@/lib/data";
+import type { PaymentSignals } from "@/lib/payment";
+import type { Reason } from "@/lib/api";
 
-type Step = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
+type Step = 1 | 2 | 3 | 4 | 5 | 6 | 7;
 
-interface Answers {
+/** HIGH tier runs every step; MEDIUM runs a short check (purpose, pressure, independent check). */
+const STEPS: Record<"full" | "short", Step[]> = {
+  full: [1, 2, 3, 4, 5, 6, 7],
+  short: [1, 2, 4, 5],
+};
+
+export interface Answers {
   purpose: string;
   contactType: string;
   relationship: string;
@@ -32,7 +36,7 @@ interface Answers {
   hasPlan: string;
   trustedContactName: string;
   trustedContactPhone: string;
-  finalDecision: string;
+  freeText: string;
 }
 
 const INITIAL_ANSWERS: Answers = {
@@ -52,51 +56,8 @@ const INITIAL_ANSWERS: Answers = {
   hasPlan: "",
   trustedContactName: "",
   trustedContactPhone: "",
-  finalDecision: "",
+  freeText: "",
 };
-
-function getRiskFlags(answers: Answers): string[] {
-  const flags: string[] = [];
-  if (answers.contactType === "someone-else")
-    flags.push(
-      "Someone other than your family member is asking for the money"
-    );
-  if (answers.metInPerson === "no")
-    flags.push("You haven't met the recipient in person");
-  if (answers.sentBefore === "no")
-    flags.push("You've never sent money to this person before");
-  if (answers.howContacted === "phone" || answers.howContacted === "text")
-    flags.push("Initial contact was by phone or text, a common scam pattern");
-  if (answers.actQuickly === "yes")
-    flags.push("You were pressured to act quickly — urgency is a top scam tactic");
-  if (answers.keepPrivate === "yes")
-    flags.push(
-      "Being asked to keep it secret is the most common sign of this type of scam"
-    );
-  if (answers.toldWhatToSay === "yes")
-    flags.push("You were coached on what to say to the bank");
-  if (answers.storyChanged === "yes")
-    flags.push("The story has changed since the first contact");
-  if (answers.calledDirectly === "no")
-    flags.push(
-      "You haven't verified this with a number you already had for your grandson"
-    );
-  if (
-    answers.metInPerson === "yes" &&
-    (answers.howContacted === "phone" || answers.howContacted === "text") &&
-    (answers.purpose === "family-emergency" || answers.purpose === "legal-fees")
-  )
-    flags.push(
-      "You say you've met them, but they contacted you about bail by phone — this is contradictory"
-    );
-  return flags;
-}
-
-function getRiskLevel(flags: string[]): "high" | "medium" | "low" {
-  if (flags.length >= 4) return "high";
-  if (flags.length >= 2) return "medium";
-  return "low";
-}
 
 function OptionButton({
   selected,
@@ -169,24 +130,35 @@ function LanguageBar() {
 }
 
 export function FraudQuestionnaire({
-  onComplete,
+  payment,
+  reasons,
+  mode,
+  existingContactName,
+  onSubmit,
   onCancel,
 }: {
-  onComplete: (decision: string) => void;
+  payment: PaymentSignals;
+  reasons: Reason[];
+  mode: "full" | "short";
+  existingContactName: string | null;
+  onSubmit: (answers: Answers) => void;
   onCancel: () => void;
 }) {
-  const [step, setStep] = useState<Step>(1);
+  const steps = STEPS[mode];
+  const [idx, setIdx] = useState(0);
+  const step = steps[idx];
   const [answers, setAnswers] = useState<Answers>(INITIAL_ANSWERS);
   const [holdingPayment, setHoldingPayment] = useState(false);
 
   const set = <K extends keyof Answers>(key: K, val: Answers[K]) =>
     setAnswers((a) => ({ ...a, [key]: val }));
 
-  const next = () => setStep((s) => Math.min(s + 1, 8) as Step);
-  const prev = () => setStep((s) => Math.max(s - 1, 1) as Step);
-
-  const flags = getRiskFlags(answers);
-  const risk = getRiskLevel(flags);
+  const next = () => {
+    if (idx === steps.length - 1) onSubmit(answers);
+    else setIdx(idx + 1);
+  };
+  const prev = () => (idx === 0 ? onCancel() : setIdx(idx - 1));
+  const familyStory = answers.purpose === "family-emergency" || answers.purpose === "legal-fees";
 
   return (
     <div className="mx-auto max-w-2xl space-y-6">
@@ -195,7 +167,7 @@ export function FraudQuestionnaire({
         <TalkToPersonButton />
       </div>
 
-      <ProgressBar step={step} total={8} />
+      <ProgressBar step={idx + 1} total={steps.length} />
 
       {step === 1 && (
         <div className="space-y-6">
@@ -206,14 +178,20 @@ export function FraudQuestionnaire({
                 Why we're pausing
               </h2>
               <p className="text-lg leading-relaxed text-amber-800 dark:text-amber-300">
-                This payment is different from your usual activity: it's{" "}
-                <strong>your first wire in 6 years</strong>, to{" "}
-                <strong>someone you haven't paid before</strong>, for{" "}
-                <strong>$8,500</strong>.
+                This {formatCurrency(payment.amount)}{" "}
+                {payment.rail.toLowerCase()} to{" "}
+                <strong>{payment.recipientName}</strong> is different from your
+                usual activity:
               </p>
+              <ul className="list-disc space-y-1 pl-6 text-lg text-amber-800 dark:text-amber-300">
+                {reasons.map((r) => (
+                  <li key={r.code}>{r.label}</li>
+                ))}
+              </ul>
               <p className="text-lg leading-relaxed text-amber-800 dark:text-amber-300">
                 We'd like to ask a few questions to help protect you. It takes
-                about <strong>4 minutes</strong>.
+                about <strong>{mode === "full" ? "4 minutes" : "1 minute"}</strong>.
+                You make the final decision.
               </p>
             </div>
           </div>
@@ -278,6 +256,20 @@ export function FraudQuestionnaire({
               </div>
             </div>
           )}
+
+          <div className="space-y-2">
+            <label className="text-base font-medium" htmlFor="freeText">
+              In your own words, what is this payment for? (optional)
+            </label>
+            <textarea
+              id="freeText"
+              rows={3}
+              value={answers.freeText}
+              onChange={(e) => set("freeText", e.target.value)}
+              placeholder="e.g. My grandson's lawyer says he needs bail tonight"
+              className="w-full rounded-xl border border-border bg-card px-4 py-3 text-base placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+            />
+          </div>
 
           <div className="flex gap-3">
             <button
@@ -477,7 +469,9 @@ export function FraudQuestionnaire({
 
           <div className="rounded-2xl border-2 border-blue-400/50 bg-blue-50 p-6 dark:border-blue-500/30 dark:bg-blue-950/30">
             <p className="text-lg leading-relaxed text-blue-900 dark:text-blue-200">
-              Have you called your grandson on a phone number{" "}
+              {familyStory
+                ? "Have you called your family member on a phone number "
+                : "Have you confirmed the payment details by calling the recipient on a number "}
               <strong>you already had</strong> — not one the caller gave you?
             </p>
           </div>
@@ -515,7 +509,7 @@ export function FraudQuestionnaire({
                   Your payment is on hold
                 </p>
                 <p className="text-sm text-emerald-700 dark:text-emerald-400">
-                  Take your time. Call your grandson, then come back here.
+                  Take your time. Make the call, then come back here.
                 </p>
               </div>
             </div>
@@ -635,6 +629,12 @@ export function FraudQuestionnaire({
               person will be <strong>informed, never given control</strong> of
               your account.
             </p>
+            {existingContactName ? (
+              <p className="text-sm font-medium text-emerald-700">
+                {existingContactName} is your trusted contact.
+              </p>
+            ) : (
+            <>
             <p className="text-sm text-muted-foreground">
               This is optional. You can add or remove a trusted contact at any
               time.
@@ -655,6 +655,8 @@ export function FraudQuestionnaire({
                 className="w-full rounded-xl border border-border bg-card px-4 py-3 text-base placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
               />
             </div>
+            </>
+            )}
           </div>
 
           <div className="flex gap-3">
@@ -669,155 +671,13 @@ export function FraudQuestionnaire({
               onClick={next}
               className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-primary px-6 py-3 text-base font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
             >
-              Review summary
+              See my risk score
               <ChevronRight className="size-5" />
             </button>
           </div>
         </div>
       )}
 
-      {step === 8 && (
-        <div className="space-y-6">
-          <h2 className="text-xl font-bold">Summary</h2>
-
-          <div className="rounded-2xl border border-border bg-card p-6 space-y-4">
-            <h3 className="text-base font-semibold">Your payment</h3>
-            <div className="grid grid-cols-2 gap-y-2 text-sm">
-              <span className="text-muted-foreground">Amount</span>
-              <span className="font-medium">$8,500.00</span>
-              <span className="text-muted-foreground">Type</span>
-              <span className="font-medium">Wire transfer</span>
-              <span className="text-muted-foreground">Recipient</span>
-              <span className="font-medium">New recipient</span>
-              <span className="text-muted-foreground">Purpose</span>
-              <span className="font-medium capitalize">
-                {answers.purpose.replace("-", " ") || "—"}
-              </span>
-            </div>
-          </div>
-
-          {flags.length > 0 && (
-            <div className="space-y-3">
-              <div className="flex items-center gap-2">
-                <AlertTriangle
-                  className={`size-5 ${
-                    risk === "high"
-                      ? "text-red-500"
-                      : risk === "medium"
-                        ? "text-amber-500"
-                        : "text-blue-500"
-                  }`}
-                />
-                <h3 className="text-base font-semibold">
-                  {flags.length} warning sign{flags.length !== 1 && "s"}{" "}
-                  detected
-                </h3>
-              </div>
-              <div className="space-y-2">
-                {flags.map((flag, i) => (
-                  <div
-                    key={i}
-                    className="flex items-start gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 dark:border-red-900/50 dark:bg-red-950/30"
-                  >
-                    <XCircle className="mt-0.5 size-4 shrink-0 text-red-500" />
-                    <p className="text-sm text-red-800 dark:text-red-300">
-                      {flag}
-                    </p>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          <div className="space-y-3">
-            <h3 className="text-base font-semibold">Your decision</h3>
-
-            <button
-              onClick={() => {
-                set("finalDecision", "talk");
-                onComplete("talk");
-              }}
-              className="flex w-full items-center gap-4 rounded-xl border-2 border-primary bg-primary/5 px-5 py-4 text-left transition-colors hover:bg-primary/10"
-            >
-              <div className="flex size-10 items-center justify-center rounded-full bg-primary/10">
-                <MessageCircle className="size-5 text-primary" />
-              </div>
-              <div>
-                <p className="font-semibold text-primary">
-                  Talk to Sound now
-                </p>
-                <p className="text-sm text-muted-foreground">
-                  Recommended — speak with a fraud specialist
-                </p>
-              </div>
-            </button>
-
-            <button
-              onClick={() => {
-                set("finalDecision", "wait");
-                onComplete("wait");
-              }}
-              className="flex w-full items-center gap-4 rounded-xl border-2 border-border px-5 py-4 text-left transition-colors hover:bg-muted/50"
-            >
-              <div className="flex size-10 items-center justify-center rounded-full bg-muted">
-                <Clock className="size-5 text-muted-foreground" />
-              </div>
-              <div>
-                <p className="font-semibold">Wait 24 hours</p>
-                <p className="text-sm text-muted-foreground">
-                  Your payment is saved — take time to think
-                </p>
-              </div>
-            </button>
-
-            <button
-              onClick={() => {
-                set("finalDecision", "cancel");
-                onComplete("cancel");
-              }}
-              className="flex w-full items-center gap-4 rounded-xl border-2 border-border px-5 py-4 text-left transition-colors hover:bg-muted/50"
-            >
-              <div className="flex size-10 items-center justify-center rounded-full bg-muted">
-                <XCircle className="size-5 text-muted-foreground" />
-              </div>
-              <div>
-                <p className="font-semibold">Cancel and report</p>
-                <p className="text-sm text-muted-foreground">
-                  Cancel the payment and file a report
-                </p>
-              </div>
-            </button>
-
-            <button
-              onClick={() => {
-                set("finalDecision", "send");
-                onComplete("send");
-              }}
-              className="flex w-full items-center gap-4 rounded-xl border-2 border-border px-5 py-4 text-left transition-colors hover:bg-muted/50"
-            >
-              <div className="flex size-10 items-center justify-center rounded-full bg-muted">
-                <Send className="size-5 text-muted-foreground" />
-              </div>
-              <div>
-                <p className="font-semibold">Send anyway</p>
-                <p className="text-sm text-muted-foreground">
-                  {risk === "high"
-                    ? "At high risk, this routes to an employee call first. You keep the final say."
-                    : "Proceed with the payment"}
-                </p>
-              </div>
-            </button>
-          </div>
-
-          <button
-            onClick={prev}
-            className="flex items-center gap-1 text-sm font-medium text-muted-foreground hover:text-foreground"
-          >
-            <ChevronLeft className="size-4" />
-            Back to questions
-          </button>
-        </div>
-      )}
     </div>
   );
 }

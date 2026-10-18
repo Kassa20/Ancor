@@ -1,6 +1,10 @@
 import express from "express";
 import cors from "cors";
-import { createClient } from "@supabase/supabase-js";
+import { supabase } from "./lib/supabase.js";
+import { riskRouter } from "./routes/risk.js";
+import { alertsRouter } from "./routes/alerts.js";
+import { trustedContactsRouter } from "./routes/trustedContacts.js";
+import { atoRouter } from "./routes/ato.js";
 
 const app = express();
 const port = process.env.PORT || 3001;
@@ -8,10 +12,10 @@ const port = process.env.PORT || 3001;
 app.use(cors());
 app.use(express.json());
 
-const supabaseUrl = process.env.SUPABASE_URL || "";
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
-
-const supabase = createClient(supabaseUrl, supabaseServiceKey);
+app.use("/api/risk", riskRouter);
+app.use("/api/alerts", alertsRouter);
+app.use("/api", trustedContactsRouter);
+app.use("/api", atoRouter);
 
 app.get("/api/members", async (_req, res) => {
   const { data, error } = await supabase.from("members").select("*");

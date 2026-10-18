@@ -9,10 +9,12 @@ import {
 import { useState } from "react";
 
 export interface TrustedContactInfo {
+  id?: string;
   name: string;
   relationship: string;
   phone: string;
   email: string;
+  autoAlert: boolean;
 }
 
 interface TrustedContactProps {
@@ -36,6 +38,7 @@ function TrustedContactForm({
   );
   const [phone, setPhone] = useState(initial?.phone ?? "");
   const [email, setEmail] = useState(initial?.email ?? "");
+  const [autoAlert, setAutoAlert] = useState(initial?.autoAlert ?? true);
 
   const canSubmit = name.trim() && relationship.trim() && (phone.trim() || email.trim());
 
@@ -132,6 +135,20 @@ function TrustedContactForm({
         </div>
       </div>
 
+      <label className="flex items-start gap-3 rounded-lg border border-border p-4 text-sm">
+        <input
+          type="checkbox"
+          className="mt-0.5"
+          checked={autoAlert}
+          onChange={(e) => setAutoAlert(e.target.checked)}
+        />
+        <span>
+          <span className="font-medium">Alert them automatically</span> if a
+          payment I'm about to send looks high-risk. They're only told that I'm
+          making an unusual payment.
+        </span>
+      </label>
+
       <div className="rounded-lg border border-amber-100 bg-amber-50 p-4">
         <p className="text-sm text-amber-800">
           <strong>Your choice, your control.</strong> You can change or remove
@@ -150,7 +167,7 @@ function TrustedContactForm({
         </button>
         <button
           onClick={() => {
-            if (canSubmit) onSave({ name, relationship, phone, email });
+            if (canSubmit) onSave({ name, relationship, phone, email, autoAlert });
           }}
           disabled={!canSubmit}
           className="flex-1 rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed"
@@ -284,6 +301,14 @@ export function TrustedContactPage({
             <p className="mt-1 text-sm font-medium">{contact!.phone}</p>
           </div>
         )}
+        <div className="px-5 py-4">
+          <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+            Automatic alerts
+          </p>
+          <p className="mt-1 text-sm font-medium">
+            {contact!.autoAlert ? "On for high-risk payments" : "Off"}
+          </p>
+        </div>
         {contact!.email && (
           <div className="px-5 py-4">
             <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
